@@ -1,0 +1,134 @@
+#!/bin/bash
+
+# ----------------------------------------
+# iOS Binary Security Audit Script
+# ----------------------------------------
+
+# Usage check
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <binary>"
+    exit 1
+fi
+
+BINARY=$1
+
+echo "======================================"
+echo "🔍 iOS Binary Security Audit"
+echo "======================================"
+
+# Utility Function
+run_check() {
+    echo -e "\n📌 $1"
+    eval "$2"
+}
+
+# 1. Linked Libraries
+run_check "Checking Linked Libraries..." \
+"otool -L \"$BINARY\""
+
+# 2. PIE (Position Independent Executable)
+run_check "Checking PIE Support..." \
+"if otool -hv \"$BINARY\" | grep -q PIE; then
+    echo '✅ PIE is enabled.'
+else
+    echo '❌ PIE is NOT enabled! Binary is vulnerable to memory corruption attacks.'
+fi"
+
+# 3. Stack Canary
+run_check "Checking Stack Canary Protection..." \
+"if otool -Iv \"$BINARY\" | grep -q stack_chk; then
+    echo '✅ Stack Canary is enabled.'
+else
+    echo '❌ Stack Canary is NOT enabled! Vulnerable to buffer overflows.'
+fi"
+
+# 4. ARC (Automatic Reference Counting)
+run_check "Checking ARC (Automatic Reference Counting)..." \
+"if otool -Iv \"$BINARY\" | grep -q _objc_release; then
+    echo '✅ ARC is enabled.'
+else
+    echo '❌ ARC is NOT enabled! Manual memory management risks present.'
+fi"
+
+# 5. Encryption (FairPlay DRM)
+run_check "Checking Encryption Status..." \
+"CRYPTID=\$(otool -l \"$BINARY\" | grep cryptid | awk '{print \$2}')
+if [ \"\$CRYPTID\" == \"1\" ]; then
+    echo '🔒 Binary is encrypted (FairPlay DRM).'
+else
+    echo '✅ Binary is NOT encrypted. Ready for static analysis.'
+fi"
+
+# 6. NX (No-Execute Bit / DEP)
+run_check "Checking NX (No-Execute) Bit..." \
+"if otool -lv \"$BINARY\" | grep -A5 LC_SEGMENT | grep __TEXT | grep -q 'r-x'; then
+    echo '✅ NX (DEP) is enabled.'
+else
+    echo '❌ NX (DEP) is NOT enabled! Memory corruption exploits are possible.'
+fi"
+
+# 7. RPATH / @rpath Usage
+run_check "Checking RPATH for Dylib Hijacking Risk..." \
+"RPATH=\$(otool -l \"$BINARY\" | grep -A 5 RPATH)
+if [ -z \"\$RPATH\" ]; then
+    echo '✅ No @rpath found. Safe from dylib hijacking.'
+else
+    echo '⚠️ @rpath found! Possible dylib hijacking risk.'
+    echo \"\$RPATH\"
+fi"
+
+# 8. Debug Symbols
+run_check "Checking for Debug Symbols..." \
+"DEBUG=\$(nm \"$BINARY\" | grep ' U ')
+if [ -z \"\$DEBUG\" ]; then
+    echo '✅ No debug symbols found.'
+else
+    echo '⚠️ Debug symbols detected! Could aid reverse engineering.'
+    echo \"\$DEBUG\"
+fi"
+
+# 9. Objective-C Class and Method Names
+run_check "Extracting Objective-C Class and Method Names..." \
+"otool -oV \"$BINARY\" | grep 'name ='"
+
+# 10. Weak Hashing Algorithms
+run_check "Checking for Weak Hashing Algorithms (MD5, SHA-1)..." \
+"HASHES=\$(otool -Iv \"$BINARY\" | grep -E 'CC_MD5|CC_SHA1')
+if [ -z \"\$HASHES\" ]; then
+    echo '✅ No weak hashing algorithms detected.'
+else
+    echo '❌ Weak hashes detected! Prefer SHA-256 or stronger.'
+    echo \"\$HASHES\"
+fi"
+
+# 11. Banned or Deprecated APIs
+run_check "Checking for Deprecated/Banned APIs..." \
+"BANNED=\$(otool -Iv \"$BINARY\" | grep -E 'gets|strcpy|strcat|getpwuid|getpwnam|system|popen|sprintf|vsprintf')
+if [ -z \"\$BANNED\" ]; then
+    echo '✅ No banned APIs found.'
+else
+    echo '❌ Banned APIs detected!'
+    echo \"\$BANNED\"
+fi"
+
+# 12. Weak Randomness
+run_check "Checking for Weak Random Number Functions..." \
+"RANDOMS=\$(otool -Iv \"$BINARY\" | grep -E 'rand|srand|random')
+if [ -z \"\$RANDOMS\" ]; then
+    echo '✅ No weak random functions found.'
+else
+    echo '⚠️ Weak randomness functions detected. Prefer arc4random().'
+    echo \"\$RANDOMS\"
+fi"
+
+# 13. Unsafe Memory Functions
+run_check "Checking for Unsafe Memory Functions..." \
+"MEMFUNCS=\$(otool -Iv \"$BINARY\" | grep -E 'malloc|free|memcpy|memmove|bzero')
+if [ -z \"\$MEMFUNCS\" ]; then
+    echo '✅ No unsafe memory functions found.'
+else
+    echo '⚠️ Unsafe memory operations detected. Ensure proper handling.'
+    echo \"\$MEMFUNCS\"
+fi"
+
+echo -e "\n✅ Security Check Complete!"
