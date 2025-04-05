@@ -33,28 +33,20 @@ The script performs the following assessments:
 nano otool_checker.sh
 Paste the full script content, then save and exit using:
 
-objectivec
-Copy
-Edit
+
 CTRL + X → Y → Enter
 2️⃣ Make the script executable:
 
-bash
-Copy
-Edit
+
 chmod +x otool_checker.sh
 3️⃣ Run the script with your iOS binary as the argument:
 
-bash
-Copy
-Edit
-./otool_checker.sh <binary_file>
-Example:
 
-bash
-Copy
-Edit
+./otool_checker.sh <binary_file>
+
+Example:
 ./otool_checker.sh MyAppBinary
+
 ✅ Requirements & Notes
 Works on macOS with otool available by default.
 
